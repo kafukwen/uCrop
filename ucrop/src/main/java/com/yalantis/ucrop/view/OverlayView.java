@@ -1,5 +1,8 @@
 package com.yalantis.ucrop.view;
 
+import android.animation.Animator;
+import android.animation.AnimatorListenerAdapter;
+import android.animation.ValueAnimator;
 import android.content.Context;
 import android.content.res.TypedArray;
 import android.graphics.Canvas;
@@ -9,6 +12,7 @@ import android.graphics.RectF;
 import android.graphics.Region;
 import android.os.Build;
 import android.util.AttributeSet;
+import android.util.Log;
 import android.view.MotionEvent;
 import android.view.View;
 
@@ -35,6 +39,7 @@ public class OverlayView extends View {
     public static final int FREESTYLE_CROP_MODE_DISABLE = 0;
     public static final int FREESTYLE_CROP_MODE_ENABLE = 1;
     public static final int FREESTYLE_CROP_MODE_ENABLE_WITH_PASS_THROUGH = 2;
+    public static final int FREESTYLE_CROP_MODE_MY = 4;
 
     public static final boolean DEFAULT_SHOW_CROP_FRAME = true;
     public static final boolean DEFAULT_SHOW_CROP_GRID = true;
@@ -65,9 +70,12 @@ public class OverlayView extends View {
     private int mFreestyleCropMode = DEFAULT_FREESTYLE_CROP_MODE;
     private float mPreviousTouchX = -1, mPreviousTouchY = -1;
     private int mCurrentTouchCornerIndex = -1;
+    private int mCurrentTouchLineIndex = -1;
     private int mTouchPointThreshold;
+    private int mTouchLineThreshold;
     private int mCropRectMinSize;
     private int mCropRectCornerTouchAreaLineLength;
+    private int mMinMyFreeStyleCropViewRectMargin;
 
     private OverlayViewChangeListener mCallback;
 
@@ -75,8 +83,10 @@ public class OverlayView extends View {
 
     {
         mTouchPointThreshold = getResources().getDimensionPixelSize(R.dimen.ucrop_default_crop_rect_corner_touch_threshold);
+        mTouchLineThreshold = getResources().getDimensionPixelSize(R.dimen.ucrop_default_crop_rect_line_touch_threshold);
         mCropRectMinSize = getResources().getDimensionPixelSize(R.dimen.ucrop_default_crop_rect_min_size);
         mCropRectCornerTouchAreaLineLength = getResources().getDimensionPixelSize(R.dimen.ucrop_default_crop_rect_corner_touch_area_line_length);
+        mMinMyFreeStyleCropViewRectMargin = getResources().getDimensionPixelSize(R.dimen.ucrop_default_my_free_style_crop_rect_margin);
     }
 
     public OverlayView(Context context) {
@@ -119,6 +129,13 @@ public class OverlayView extends View {
      */
     public void setFreestyleCropEnabled(boolean freestyleCropEnabled) {
         mFreestyleCropMode = freestyleCropEnabled ? FREESTYLE_CROP_MODE_ENABLE : FREESTYLE_CROP_MODE_DISABLE;
+    }
+
+    /***
+     * Please use the new method {@link #setFreestyleCropMode setFreestyleCropMode} method as we have more than 1 freestyle crop mode.
+     */
+    public void setMyFreestyleCropEnabled(boolean myFreestyleCropEnabled) {
+        mFreestyleCropMode = myFreestyleCropEnabled ? FREESTYLE_CROP_MODE_MY : mFreestyleCropMode;
     }
 
     @FreestyleMode
@@ -314,7 +331,9 @@ public class OverlayView extends View {
 
         if ((event.getAction() & MotionEvent.ACTION_MASK) == MotionEvent.ACTION_DOWN) {
             mCurrentTouchCornerIndex = getCurrentTouchIndex(x, y);
-            boolean shouldHandle = mCurrentTouchCornerIndex != -1;
+            mCurrentTouchLineIndex = getCurrentTouchLineIndex(x, y);
+
+            boolean shouldHandle = mCurrentTouchCornerIndex != -1 || mCurrentTouchLineIndex != -1;
             if (!shouldHandle) {
                 mPreviousTouchX = -1;
                 mPreviousTouchY = -1;
@@ -325,9 +344,8 @@ public class OverlayView extends View {
             return shouldHandle;
         }
 
-        if ((event.getAction() & MotionEvent.ACTION_MASK) == MotionEvent.ACTION_MOVE) {
-            if (event.getPointerCount() == 1 && mCurrentTouchCornerIndex != -1) {
-
+        if ((event.getAction() & MotionEvent.ACTION_MASK) == MotionEvent.ACTION_MOVE && event.getPointerCount() == 1) {
+            if (mCurrentTouchCornerIndex != -1) {
                 x = Math.min(Math.max(x, getPaddingLeft()), getWidth() - getPaddingRight());
                 y = Math.min(Math.max(y, getPaddingTop()), getHeight() - getPaddingBottom());
 
@@ -337,6 +355,14 @@ public class OverlayView extends View {
                 mPreviousTouchY = y;
 
                 return true;
+            } else if (mCurrentTouchLineIndex != -1) {
+                x = Math.min(Math.max(x, getPaddingLeft()), getWidth() - getPaddingRight());
+                y = Math.min(Math.max(y, getPaddingTop()), getHeight() - getPaddingBottom());
+
+                updateCropViewRectOnTouchLine(x, y);
+
+                mPreviousTouchX = x;
+                mPreviousTouchY = y;
             }
         }
 
@@ -344,9 +370,14 @@ public class OverlayView extends View {
             mPreviousTouchX = -1;
             mPreviousTouchY = -1;
             mCurrentTouchCornerIndex = -1;
+            mCurrentTouchLineIndex = -1;
 
             if (mCallback != null) {
-                mCallback.onCropRectUpdated(mCropViewRect);
+                if (mFreestyleCropMode == FREESTYLE_CROP_MODE_MY) {
+                    setCropViewRectToWrapToCenter();
+                } else {
+                    mCallback.onCropRectUpdated(mCropViewRect);
+                }
             }
         }
 
@@ -390,18 +421,38 @@ public class OverlayView extends View {
                 return;
         }
 
-        boolean changeHeight = mTempRect.height() >= mCropRectMinSize;
-        boolean changeWidth = mTempRect.width() >= mCropRectMinSize;
-        mCropViewRect.set(
-                changeWidth ? mTempRect.left : mCropViewRect.left,
-                changeHeight ? mTempRect.top : mCropViewRect.top,
-                changeWidth ? mTempRect.right : mCropViewRect.right,
-                changeHeight ? mTempRect.bottom : mCropViewRect.bottom);
+        updateCropViewRect();
+    }
 
-        if (changeHeight || changeWidth) {
-            updateGridPoints();
-            postInvalidate();
+
+    /**
+     * * The order of the lines is:
+     * ----0--->
+     * ^        |
+     * 3        1
+     * |        v
+     * <---2----
+     */
+    private void updateCropViewRectOnTouchLine(float touchX, float touchY) {
+        mTempRect.set(mCropViewRect);
+
+        switch (mCurrentTouchLineIndex) {
+            // resize rectangle
+            case 0:
+                mTempRect.set(mCropViewRect.left, touchY, mCropViewRect.right, mCropViewRect.bottom);
+                break;
+            case 1:
+                mTempRect.set(mCropViewRect.left, mCropViewRect.top, touchX, mCropViewRect.bottom);
+                break;
+            case 2:
+                mTempRect.set(mCropViewRect.left, mCropViewRect.top, mCropViewRect.right, touchY);
+                break;
+            case 3:
+                mTempRect.set(touchX, mCropViewRect.top, mCropViewRect.right, mCropViewRect.bottom);
+                break;
         }
+
+        updateCropViewRect();
     }
 
     /**
@@ -446,6 +497,37 @@ public class OverlayView extends View {
 //            }
 //        }
         return closestPointIndex;
+    }
+
+
+    /**
+     * * The order of the lines in the float array is:
+     * ----0--->
+     * ^        |
+     * 3        1
+     * |        v
+     * <---2----
+     *
+     * @return - index of line that is being dragged
+     */
+    private int getCurrentTouchLineIndex(float touchX, float touchY) {
+        int closestLineIndex = -1;
+
+        if (touchX > mCropGridCorners[0] && touchX < mCropGridCorners[2]) {
+            if (Math.abs(touchY - mCropGridCorners[1]) < mTouchLineThreshold) {
+                closestLineIndex = 0;
+            } else if (Math.abs(touchY - mCropGridCorners[5]) < mTouchLineThreshold) {
+                closestLineIndex = 2;
+            }
+        } else if (touchY > mCropGridCorners[3] && touchY < mCropGridCorners[5]) {
+            if (Math.abs(touchX - mCropGridCorners[2]) < mTouchLineThreshold) {
+                closestLineIndex = 1;
+            } else if (Math.abs(touchX - mCropGridCorners[6]) < mTouchLineThreshold) {
+                closestLineIndex = 3;
+            }
+        }
+
+        return closestLineIndex;
     }
 
     /**
@@ -578,9 +660,48 @@ public class OverlayView extends View {
         mCropGridColumnCount = a.getInt(R.styleable.ucrop_UCropView_ucrop_grid_column_count, DEFAULT_CROP_GRID_COLUMN_COUNT);
     }
 
+    private void setCropViewRectToWrapToCenter() {
+        mTempRect.set(mCropViewRect);
+
+        RectF centeredRect = RectUtils.getCenteredWrapCropRect(getContext(), mCropViewRect, mMinMyFreeStyleCropViewRectMargin);
+        ValueAnimator animator = ValueAnimator.ofObject(new RectTypeEvaluator(), mCropViewRect, centeredRect);
+        animator.setDuration(500);
+        animator.addUpdateListener(new ValueAnimator.AnimatorUpdateListener() {
+            @Override
+            public void onAnimationUpdate(ValueAnimator animation) {
+                mCallback.onCropAnimationUpdate(animation);
+
+                RectF centeringRect = (RectF) animation.getAnimatedValue();
+                mTempRect.set(centeringRect);
+                updateCropViewRect();
+            }
+        });
+        animator.addListener(new AnimatorListenerAdapter() {
+            @Override
+            public void onAnimationEnd(Animator animation) {
+                mCallback.onCropRectUpdated(mCropViewRect);
+            }
+        });
+        animator.start();
+    }
+
+    private void updateCropViewRect() {
+        boolean changeHeight = mTempRect.height() >= mCropRectMinSize;
+        boolean changeWidth = mTempRect.width() >= mCropRectMinSize;
+        mCropViewRect.set(
+                changeWidth ? mTempRect.left : mCropViewRect.left,
+                changeHeight ? mTempRect.top : mCropViewRect.top,
+                changeWidth ? mTempRect.right : mCropViewRect.right,
+                changeHeight ? mTempRect.bottom : mCropViewRect.bottom);
+
+        if (changeHeight || changeWidth) {
+            updateGridPoints();
+            postInvalidate();
+        }
+    }
 
     @Retention(RetentionPolicy.SOURCE)
-    @IntDef({FREESTYLE_CROP_MODE_DISABLE, FREESTYLE_CROP_MODE_ENABLE, FREESTYLE_CROP_MODE_ENABLE_WITH_PASS_THROUGH})
+    @IntDef({FREESTYLE_CROP_MODE_DISABLE, FREESTYLE_CROP_MODE_ENABLE, FREESTYLE_CROP_MODE_ENABLE_WITH_PASS_THROUGH, FREESTYLE_CROP_MODE_MY})
     public @interface FreestyleMode {
     }
 

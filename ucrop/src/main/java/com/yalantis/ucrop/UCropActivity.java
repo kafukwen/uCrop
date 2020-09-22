@@ -120,12 +120,15 @@ public class UCropActivity extends AppCompatActivity {
         AppCompatDelegate.setCompatVectorFromResourcesEnabled(true);
     }
 
+    private boolean isMyFreestyleCropEnable = false;
+
     @Override
     public void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.ucrop_activity_photobox);
 
         final Intent intent = getIntent();
+        isMyFreestyleCropEnable = intent.getBooleanExtra(UCrop.Options.EXTRA_MY_FREE_STYLE_CROP, OverlayView.DEFAULT_FREESTYLE_CROP_MODE != OverlayView.FREESTYLE_CROP_MODE_DISABLE);
 
         setupViews(intent);
         setImageData(intent);
@@ -240,6 +243,7 @@ public class UCropActivity extends AppCompatActivity {
 
         // Overlay view options
         mOverlayView.setFreestyleCropEnabled(intent.getBooleanExtra(UCrop.Options.EXTRA_FREE_STYLE_CROP, OverlayView.DEFAULT_FREESTYLE_CROP_MODE != OverlayView.FREESTYLE_CROP_MODE_DISABLE));
+        mOverlayView.setMyFreestyleCropEnabled(isMyFreestyleCropEnable);
 
         mOverlayView.setDimmedColor(intent.getIntExtra(UCrop.Options.EXTRA_DIMMED_LAYER_COLOR, getResources().getColor(R.color.ucrop_color_default_dimmed)));
         mOverlayView.setCircleDimmedLayer(intent.getBooleanExtra(UCrop.Options.EXTRA_CIRCLE_DIMMED_LAYER, OverlayView.DEFAULT_CIRCLE_DIMMED_LAYER));
@@ -295,7 +299,7 @@ public class UCropActivity extends AppCompatActivity {
         mToolbarTitle = intent.getStringExtra(UCrop.Options.EXTRA_UCROP_TITLE_TEXT_TOOLBAR);
         mToolbarTitle = mToolbarTitle != null ? mToolbarTitle : getResources().getString(R.string.ucrop_label_edit_photo);
         mLogoColor = intent.getIntExtra(UCrop.Options.EXTRA_UCROP_LOGO_COLOR, ContextCompat.getColor(this, R.color.ucrop_color_default_logo));
-        mShowBottomControls = !intent.getBooleanExtra(UCrop.Options.EXTRA_HIDE_BOTTOM_CONTROLS, false);
+        mShowBottomControls = !intent.getBooleanExtra(UCrop.Options.EXTRA_HIDE_BOTTOM_CONTROLS, false) && !isMyFreestyleCropEnable;
         mRootViewBackgroundColor = intent.getIntExtra(UCrop.Options.EXTRA_UCROP_ROOT_VIEW_BACKGROUND_COLOR, ContextCompat.getColor(this, R.color.ucrop_color_crop_background));
 
         setupAppBar();

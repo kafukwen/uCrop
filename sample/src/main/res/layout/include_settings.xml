@@ -133,6 +133,13 @@
 
                 </LinearLayout>
 
+                <CheckBox
+                    android:id="@+id/checkbox_my_freestyle_crop"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="@string/label_my_freestyle_crop"
+                    android:textAppearance="?android:textAppearanceMedium" />
+
             </RadioGroup>
 
             <View

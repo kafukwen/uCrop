@@ -60,6 +60,7 @@ public class SampleActivity extends BaseActivity implements UCropFragmentCallbac
     private TextView mTextViewQuality;
     private CheckBox mCheckBoxHideBottomControls;
     private CheckBox mCheckBoxFreeStyleCrop;
+    private CheckBox mCheckBoxMyFreeStyleCrop;
     private Toolbar toolbar;
     private ScrollView settingsView;
     private int requestMode = BuildConfig.RequestMode;
@@ -172,6 +173,7 @@ public class SampleActivity extends BaseActivity implements UCropFragmentCallbac
         mTextViewQuality = findViewById(R.id.text_view_quality);
         mCheckBoxHideBottomControls = findViewById(R.id.checkbox_hide_bottom_controls);
         mCheckBoxFreeStyleCrop = findViewById(R.id.checkbox_freestyle_crop);
+        mCheckBoxMyFreeStyleCrop = findViewById(R.id.checkbox_my_freestyle_crop);
 
         mRadioGroupAspectRatio.check(R.id.radio_dynamic);
         mEditTextRatioX.addTextChangedListener(mAspectRatioTextWatcher);
@@ -310,6 +312,7 @@ public class SampleActivity extends BaseActivity implements UCropFragmentCallbac
 
         options.setHideBottomControls(mCheckBoxHideBottomControls.isChecked());
         options.setFreeStyleCropEnabled(mCheckBoxFreeStyleCrop.isChecked());
+        options.setMyFreeStyleCropEnabled(mCheckBoxFreeStyleCrop.isChecked());
 
         /*
         If you want to configure how gestures work for all UCropActivity tabs

@@ -1,6 +1,12 @@
 package com.yalantis.ucrop.util;
 
+import android.app.Activity;
+import android.content.Context;
 import android.graphics.RectF;
+import android.util.DisplayMetrics;
+import android.view.View;
+
+import com.yalantis.ucrop.R;
 
 public class RectUtils {
 
@@ -67,6 +73,56 @@ public class RectUtils {
         }
         r.sort();
         return r;
+    }
+
+    /**
+     * @param context the UCropActivity context
+     * @param cropViewRect the crop rect when you changed the crop area in my free crop style
+     * @param cropViewRectMargin the biggest crop rect margin to the screen content
+     * @return the final crop rect after the enlarging animation in same ratio to the center of the screen content
+     */
+    public static RectF getCenteredWrapCropRect(Context context, RectF cropViewRect, int cropViewRectMargin) {
+        int screenWidth = getScreenWidth(context);
+        int contentHeight = getContentHeight(context);
+        float centeredRectWidth, centeredRectHeight;
+
+        if (cropViewRect.width() > cropViewRect.height()) {
+            centeredRectWidth = screenWidth - cropViewRectMargin * 2;
+            centeredRectHeight = cropViewRect.height() * centeredRectWidth / cropViewRect.width();
+            if (centeredRectHeight > contentHeight - cropViewRectMargin * 2) {
+                centeredRectHeight = contentHeight - cropViewRectMargin * 2;
+                centeredRectWidth = cropViewRect.width() * centeredRectHeight / cropViewRect.height();
+            }
+        } else {
+            centeredRectHeight = contentHeight - cropViewRectMargin * 2;
+            centeredRectWidth = cropViewRect.width() * centeredRectHeight / cropViewRect.height();
+            if (centeredRectWidth > screenWidth - cropViewRectMargin * 2) {
+                centeredRectWidth = screenWidth - cropViewRectMargin * 2;
+                centeredRectHeight = cropViewRect.height() * centeredRectWidth / cropViewRect.width();
+            }
+        }
+
+        RectF rect = new RectF();
+        rect.left = (screenWidth - centeredRectWidth) * 0.5f;
+        rect.right = rect.left + centeredRectWidth;
+        rect.top = (contentHeight - centeredRectHeight) * 0.5f;
+        rect.bottom = rect.top + centeredRectHeight;
+        return rect;
+    }
+
+    private static int getScreenWidth(Context context) {
+        DisplayMetrics dm = context.getResources().getDisplayMetrics();
+        return dm.widthPixels;
+    }
+
+    private static int getContentHeight(Context context) {
+        if (context instanceof Activity) {
+            View content = ((Activity) context).findViewById(R.id.ucrop_frame);
+            if (content != null) {
+                return content.getMeasuredHeight();
+            }
+        }
+        return 0;
     }
 
 }

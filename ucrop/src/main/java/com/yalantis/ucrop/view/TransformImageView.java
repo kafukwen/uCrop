@@ -256,6 +256,18 @@ public class TransformImageView extends AppCompatImageView {
         }
     }
 
+    /**
+     * This method provides multi image transform.
+     *
+     * @param transformMatrix - transform matrix
+     */
+    public void postConcat(Matrix transformMatrix) {
+        if (transformMatrix != null) {
+            mCurrentImageMatrix.postConcat(transformMatrix);
+            setImageMatrix(mCurrentImageMatrix);
+        }
+    }
+
     protected void init() {
         setScaleType(ScaleType.MATRIX);
     }

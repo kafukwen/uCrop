@@ -295,6 +295,7 @@ public class UCrop {
 
         public static final String EXTRA_HIDE_BOTTOM_CONTROLS = EXTRA_PREFIX + ".HideBottomControls";
         public static final String EXTRA_FREE_STYLE_CROP = EXTRA_PREFIX + ".FreeStyleCrop";
+        public static final String EXTRA_MY_FREE_STYLE_CROP = EXTRA_PREFIX + ".MyFreeStyleCrop";
 
         public static final String EXTRA_ASPECT_RATIO_SELECTED_BY_DEFAULT = EXTRA_PREFIX + ".AspectRatioSelectedByDefault";
         public static final String EXTRA_ASPECT_RATIO_OPTIONS = EXTRA_PREFIX + ".AspectRatioOptions";
@@ -508,6 +509,13 @@ public class UCrop {
          */
         public void setFreeStyleCropEnabled(boolean enabled) {
             mOptionBundle.putBoolean(EXTRA_FREE_STYLE_CROP, enabled);
+        }
+
+        /**
+         * @param enabled - set to true to let user resize crop bounds with my style freely (disabled by default)
+         */
+        public void setMyFreeStyleCropEnabled(boolean enabled) {
+            mOptionBundle.putBoolean(EXTRA_MY_FREE_STYLE_CROP, enabled);
         }
 
         /**

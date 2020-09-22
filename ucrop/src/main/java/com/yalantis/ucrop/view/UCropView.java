@@ -1,17 +1,20 @@
 package com.yalantis.ucrop.view;
 
+import android.animation.ValueAnimator;
 import android.content.Context;
 import android.content.res.TypedArray;
+import android.graphics.Matrix;
 import android.graphics.RectF;
 import android.util.AttributeSet;
+import android.util.Log;
 import android.view.LayoutInflater;
 import android.widget.FrameLayout;
+
+import androidx.annotation.NonNull;
 
 import com.yalantis.ucrop.R;
 import com.yalantis.ucrop.callback.CropBoundsChangeListener;
 import com.yalantis.ucrop.callback.OverlayViewChangeListener;
-
-import androidx.annotation.NonNull;
 
 public class UCropView extends FrameLayout {
 
@@ -49,6 +52,22 @@ public class UCropView extends FrameLayout {
             @Override
             public void onCropRectUpdated(RectF cropRect) {
                 mGestureCropImageView.setCropRect(cropRect);
+            }
+
+            @Override
+            public void onCropAnimationUpdate(ValueAnimator animation) {
+                RectF oldRect = mViewOverlay.getCropViewRect();
+                RectF newRect = (RectF) animation.getAnimatedValue();
+
+                float sx = newRect.width() / oldRect.width();
+                float sy = newRect.height() / oldRect.height();
+                float dx = newRect.centerX() - oldRect.centerX();
+                float dy = newRect.centerY() - oldRect.centerY();
+
+                Matrix matrix = new Matrix();
+                matrix.postTranslate(dx, dy);
+                matrix.postScale(sx, sy, newRect.centerX(), newRect.centerY());
+                mGestureCropImageView.postConcat(matrix);
             }
         });
     }
